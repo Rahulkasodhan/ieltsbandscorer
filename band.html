@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Free AI IELTS Writing Checker</title>
+    <!-- Load Tailwind CSS for instant, responsive styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Use the Inter font -->
+    <style>
+        @import url('https://fonts.fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fb;
+        }
+        /* Custom scrollbar for textareas */
+        textarea::-webkit-scrollbar {
+            width: 8px;
+        }
+        textarea::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+        }
+        textarea::-webkit-scrollbar-thumb {
+            background: #c7c7c7; 
+            border-radius: 4px;
+        }
+        textarea::-webkit-scrollbar-thumb:hover {
+            background: #a0a0a0; 
+        }
+    </style>
+</head>
+<body class="p-4 md:p-8 min-h-screen">
+
+    <div class="max-w-4xl mx-auto">
+        <header class="text-center py-6 bg-white shadow-md rounded-xl mb-8 border border-gray-100">
+            <h1 class="text-3xl md:text-4xl font-extrabold text-indigo-700 tracking-tight">IELTS Writing Score Predictor</h1>
+            <p class="mt-2 text-gray-500">Instant band scores & feedback for Task 1 & 2. Powered by Google Gemini.</p>
+        </header>
+
+        <!-- Main Content Area -->
+        <main class="space-y-8">
+            
+            <!-- Task Selection Tabs -->
+            <div class="flex border-b border-gray-200 bg-gray-50 rounded-t-xl overflow-hidden">
+                <button id="tab-task1" class="tab-button flex-1 py-4 text-lg font-medium text-center transition duration-200 border-b-4 border-indigo-600 text-indigo-600 bg-white" data-task="task1">
+                    Task 1 (Report/Letter)
+                </button>
+                <button id="tab-task2" class="tab-button flex-1 py-4 text-lg font-medium text-center transition duration-200 border-b-4 border-transparent text-gray-500 hover:text-indigo-600 hover:bg-gray-50" data-task="task2">
+                    Task 2 (Essay)
+                </button>
+            </div>
+
+            <!-- Input Form -->
+            <div id="input-container" class="bg-white p-6 rounded-b-xl rounded-t-none shadow-lg space-y-6 border border-gray-100">
+                
+                <!-- Task Prompt Input -->
+                <div>
+                    <label for="prompt-input" class="block text-sm font-semibold text-gray-700 mb-2">
+                        IELTS Prompt/Question <span class="text-red-500">*</span>
+                    </label>
+                    <textarea id="prompt-input" rows="3" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 resize-none transition-shadow" placeholder="Paste the full question here (e.g., 'The chart below shows...' or 'Some people believe...'). The AI needs this to grade Task Achievement."></textarea>
+                </div>
+                
+                <!-- Student Answer Input -->
+                <div>
+                    <label for="writing-input" class="block text-sm font-semibold text-gray-700 mb-2">
+                        Your Answer (<span id="word-count" class="font-mono">0</span> words) <span class="text-red-500">*</span>
+                    </label>
+                    <textarea id="writing-input" rows="12" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-shadow font-serif text-lg leading-relaxed text-gray-800" placeholder="Type or paste your essay here..."></textarea>
+                    <p id="word-count-warning" class="text-sm mt-2 text-amber-600 hidden flex items-center">
+                        <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        Word count is below the recommended minimum.
+                    </p>
+                    <p id="persistence-status" class="text-xs text-gray-400 mt-2 text-right italic">Draft saved locally</p>
+                </div>
+                
+                <!-- Submit Button -->
+                <button id="submit-button" class="w-full bg-indigo-600 text-white font-bold py-4 rounded-lg shadow-md hover:bg-indigo-700 hover:shadow-lg transition duration-300 focus:outline-none focus:ring-4 focus:ring-indigo-300 flex items-center justify-center transform active:scale-[0.99]">
+                    <svg id="submit-icon" class="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                    <span id="submit-text" class="text-lg">Check My Writing</span>
+                </button>
+                
+                <!-- Loading Indicator -->
+                <div id="loading-spinner" class="hidden flex flex-col items-center justify-center py-6">
+                    <div class="animate-spin inline-block w-10 h-10 border-4 border-indigo-200 border-t-indigo-600 rounded-full mb-3"></div>
+                    <p class="text-indigo-700 font-medium animate-pulse">Analyzing vocabulary, grammar, and coherence...</p>
+                </div>
+                
+                <!-- Error Message -->
+                <div id="error-message" class="hidden bg-red-50 border-l-4 border-red-500 text-red-700 px-4 py-3 rounded shadow-sm" role="alert">
+                    <div class="flex">
+                        <div class="py-1"><svg class="fill-current h-6 w-6 text-red-500 mr-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M2.93 17.07A10 10 0 1 1 17.07 2.93 10 10 0 0 1 2.93 17.07zm12.73-1.41A8 8 0 1 0 4.34 4.34a8 8 0 0 0 11.32 11.32zM9 11V9h2v6H9v-4zm0-6h2v2H9V5z"/></svg></div>
+                        <div>
+                            <p class="font-bold">Analysis Failed</p>
+                            <p class="text-sm" id="error-text">Something went wrong.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Display Area -->
+            <div id="results-area" class="hidden space-y-6">
+                
+                <!-- Overall Score & Criteria Scores -->
+                <div class="grid md:grid-cols-3 gap-6">
+                    <!-- Overall Score Card -->
+                    <div class="col-span-1 bg-gradient-to-br from-indigo-600 to-blue-700 text-white p-6 rounded-xl shadow-xl flex flex-col justify-center items-center text-center relative overflow-hidden">
+                        <div class="absolute top-0 left-0 w-full h-full bg-white opacity-10 transform rotate-12 scale-150"></div>
+                        <p class="text-indigo-100 font-medium uppercase tracking-wider text-sm relative z-10">Estimated Band Score</p>
+                        <p id="overall-score" class="text-7xl font-black mt-2 relative z-10">0.0</p>
+                        <p id="result-task-type" class="text-indigo-200 text-xs mt-2 relative z-10">Writing Task</p>
+                    </div>
+
+                    <!-- Criteria Score Cards -->
+                    <div class="col-span-2 grid grid-cols-2 gap-4">
+                        <div class="bg-white p-4 rounded-xl shadow border border-gray-100 hover:border-indigo-200 transition">
+                            <div class="flex justify-between items-start">
+                                <p class="text-xs text-gray-500 uppercase font-bold">Task Achievement</p>
+                                <span id="score-tr" class="text-2xl font-bold text-indigo-600">-</span>
+                            </div>
+                            <p class="text-xs text-gray-400 mt-1">Did you answer the prompt?</p>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl shadow border border-gray-100 hover:border-indigo-200 transition">
+                            <div class="flex justify-between items-start">
+                                <p class="text-xs text-gray-500 uppercase font-bold">Coherence & Cohesion</p>
+                                <span id="score-cc" class="text-2xl font-bold text-indigo-600">-</span>
+                            </div>
+                             <p class="text-xs text-gray-400 mt-1">Flow and linking words.</p>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl shadow border border-gray-100 hover:border-indigo-200 transition">
+                            <div class="flex justify-between items-start">
+                                <p class="text-xs text-gray-500 uppercase font-bold">Lexical Resource</p>
+                                <span id="score-lr" class="text-2xl font-bold text-indigo-600">-</span>
+                            </div>
+                             <p class="text-xs text-gray-400 mt-1">Vocabulary range.</p>
+                        </div>
+                        <div class="bg-white p-4 rounded-xl shadow border border-gray-100 hover:border-indigo-200 transition">
+                            <div class="flex justify-between items-start">
+                                <p class="text-xs text-gray-500 uppercase font-bold">Grammar</p>
+                                <span id="score-gra" class="text-2xl font-bold text-indigo-600">-</span>
+                            </div>
+                             <p class="text-xs text-gray-400 mt-1">Accuracy and sentence variety.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detailed Feedback and Mistakes -->
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
+                    <div class="p-6 border-b border-gray-100 bg-green-50">
+                        <h3 class="text-lg font-bold text-green-800 flex items-center">
+                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                            How to Increase Your Score
+                        </h3>
+                        <p id="detailed-feedback" class="mt-2 text-gray-700 leading-relaxed"></p>
+                    </div>
+                    
+                    <div class="p-6">
+                        <h3 class="text-lg font-bold text-gray-800 mb-4 flex items-center">
+                            <svg class="w-5 h-5 mr-2 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+                            Key Mistakes & Corrections
+                        </h3>
+                        <ul id="mistakes-list" class="space-y-4">
+                            <!-- Mistakes will be injected here -->
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+        
+        <footer class="text-center py-8 text-gray-400 text-sm">
+            <p>Disclaimer: This is an AI-generated estimation. Official IELTS scores may vary.</p>
+        </footer>
+    </div>
+
+    <!-- JavaScript for Logic -->
+    <script type="module">
+        // Import Firebase modules (optional usage)
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // ==========================================================================
+        // 🔧 CONFIGURATION SECTION
+        // ==========================================================================
+        
+        // 🔴 STEP 1: INSERT YOUR GEMINI API KEY HERE
+        // Get one for free at https://aistudio.google.com/app/apikey
+        const apiKey = "AIzaSyDfDQOL5j5y6dDgRF6L6IgvRlkWsL9hiSc"; 
+
+        // 🔵 STEP 2: (OPTIONAL) FIREBASE CONFIG
+        // If you leave this empty, the app will use LocalStorage (browser memory)
+        // which is perfect for testing without setting up a backend.
+        const firebaseConfig = {
+            // apiKey: "...",
+            // authDomain: "...",
+            // projectId: "...",
+            // ...
+        };
+
+        // ==========================================================================
+        // APP LOGIC
+        // ==========================================================================
+
+        let currentTaskType = 'task1'; 
+        const MIN_WORDS_T1 = 150;
+        const MIN_WORDS_T2 = 250;
+        
+        // Storage Variables
+        let db = null;
+        let isFirebaseReady = false;
+        
+        // Using gemini-2.5-flash (Stable, Fast, Free-tier eligible)
+const API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+
+        // --- Persistence Layer (Hybrid: Firebase or LocalStorage) ---
+
+        async function initStorage() {
+            // Try to init Firebase if config exists
+            if (firebaseConfig.apiKey) {
+                try {
+                    const app = initializeApp(firebaseConfig);
+                    db = getFirestore(app);
+                    isFirebaseReady = true;
+                    console.log("Firebase initialized.");
+                } catch (e) {
+                    console.warn("Firebase init failed, falling back to LocalStorage.", e);
+                }
+            } else {
+                console.log("No Firebase config found. Using LocalStorage.");
+            }
+            
+            await loadData();
+        }
+
+        async function saveData() {
+            const promptInput = document.getElementById('prompt-input').value;
+            const writingInput = document.getElementById('writing-input').value;
+            const data = {
+                prompt: promptInput,
+                writing: writingInput,
+                task: currentTaskType,
+                timestamp: new Date().toISOString()
+            };
+
+            // UI Feedback
+            const statusEl = document.getElementById('persistence-status');
+            statusEl.textContent = "Saving...";
+
+            if (isFirebaseReady && db) {
+                // Save to Firebase (Simplified: using a static ID for demo)
+                try {
+                    await setDoc(doc(db, "ielts_attempts", "user_draft"), data);
+                    statusEl.textContent = "Saved to Cloud";
+                } catch (e) {
+                    console.error("Cloud save failed", e);
+                    // Fallback
+                    localStorage.setItem('ielts_draft', JSON.stringify(data));
+                    statusEl.textContent = "Saved locally (Cloud error)";
+                }
+            } else {
+                // Save to LocalStorage
+                localStorage.setItem('ielts_draft', JSON.stringify(data));
+                setTimeout(() => { statusEl.textContent = "Saved locally"; }, 500);
+            }
+        }
+
+        async function loadData() {
+            let data = null;
+
+            if (isFirebaseReady && db) {
+                try {
+                    const docSnap = await getDoc(doc(db, "ielts_attempts", "user_draft"));
+                    if (docSnap.exists()) data = docSnap.data();
+                } catch (e) {
+                    console.warn("Cloud load failed", e);
+                }
+            }
+            
+            // Fallback check
+            if (!data) {
+                const localData = localStorage.getItem('ielts_draft');
+                if (localData) data = JSON.parse(localData);
+            }
+
+            if (data) {
+                document.getElementById('prompt-input').value = data.prompt || '';
+                document.getElementById('writing-input').value = data.writing || '';
+                if (data.task) switchTask(data.task);
+                updateWordCount();
+            }
+        }
+
+
+        // --- UI Logic ---
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initStorage();
+            
+            // Tabs
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.addEventListener('click', (e) => switchTask(e.currentTarget.dataset.task));
+            });
+
+            // Inputs
+            const inputs = ['prompt-input', 'writing-input'];
+            inputs.forEach(id => {
+                document.getElementById(id).addEventListener('input', () => {
+                    saveData(); // Auto-save
+                    if (id === 'writing-input') updateWordCount();
+                });
+            });
+            
+            // Submit
+            document.getElementById('submit-button').addEventListener('click', analyzeWriting);
+
+            switchTask('task1'); // Default
+        });
+
+        function switchTask(taskType) {
+            currentTaskType = taskType;
+            
+            // Visuals
+            document.querySelectorAll('.tab-button').forEach(btn => {
+                if(btn.dataset.task === taskType) {
+                    btn.classList.add('border-indigo-600', 'text-indigo-600', 'bg-white');
+                    btn.classList.remove('border-transparent', 'text-gray-500', 'hover:bg-gray-50');
+                } else {
+                    btn.classList.remove('border-indigo-600', 'text-indigo-600', 'bg-white');
+                    btn.classList.add('border-transparent', 'text-gray-500', 'hover:bg-gray-50');
+                }
+            });
+
+            // Placeholders logic could go here if needed
+            updateWordCount();
+        }
+
+        function updateWordCount() {
+            const text = document.getElementById('writing-input').value.trim();
+            const count = text ? text.match(/[\w\d’'-]+/gi)?.length || 0 : 0;
+            
+            document.getElementById('word-count').textContent = count;
+            
+            const minWords = currentTaskType === 'task1' ? MIN_WORDS_T1 : MIN_WORDS_T2;
+            const warningEl = document.getElementById('word-count-warning');
+            
+            if (count > 0 && count < minWords) {
+                warningEl.innerHTML = `<svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg> Warning: ${currentTaskType === 'task1'?'Task 1':'Task 2'} requires ${minWords} words.`;
+                warningEl.classList.remove('hidden');
+                warningEl.classList.add('flex');
+            } else {
+                warningEl.classList.add('hidden');
+                warningEl.classList.remove('flex');
+            }
+        }
+
+
+        // --- Gemini Analysis ---
+
+        const SCORING_SCHEMA = {
+            type: "OBJECT",
+            properties: {
+                overallBandScore: { type: "STRING" },
+                taskType: { type: "STRING" },
+                taskCriteriaScores: {
+                    type: "OBJECT",
+                    properties: {
+                        TaskAchievementOrResponse: { type: "STRING" },
+                        CoherenceAndCohesion: { type: "STRING" },
+                        LexicalResource: { type: "STRING" },
+                        GrammaticalRangeAndAccuracy: { type: "STRING" }
+                    }
+                },
+                keyMistakesAndCorrections: {
+                    type: "ARRAY",
+                    items: {
+                        type: "OBJECT",
+                        properties: {
+                            mistake: { type: "STRING" },
+                            correction: { type: "STRING" }
+                        }
+                    }
+                },
+                detailedFeedbackToElevateScore: { type: "STRING" }
+            },
+            required: ["overallBandScore", "taskCriteriaScores", "keyMistakesAndCorrections", "detailedFeedbackToElevateScore"]
+        };
+
+        async function analyzeWriting() {
+            const promptInput = document.getElementById('prompt-input').value.trim();
+            const writingInput = document.getElementById('writing-input').value.trim();
+            
+            // UI Reset
+            document.getElementById('error-message').classList.add('hidden');
+            document.getElementById('results-area').classList.add('hidden');
+            
+            // Validation
+            if(apiKey === "AIzaSyDw121bcP8Ay2w_2wxspBs68eAzpHRzbsg" || !apiKey) {
+                showError("API Key Missing. Please edit the HTML file and insert your Gemini API Key in the configuration section.");
+                return;
+            }
+            if (!promptInput || !writingInput) {
+                showError("Please fill in both the prompt and your answer.");
+                return;
+            }
+
+            setLoading(true);
+
+            try {
+                const result = await callGeminiAPI(promptInput, writingInput);
+                displayResults(result);
+            } catch (error) {
+                showError(error.message);
+            } finally {
+                setLoading(false);
+            }
+        }
+        
+        async function callGeminiAPI(prompt, essay) {
+            const taskName = currentTaskType === 'task1' ? 'IELTS ACADEMIC WRITING TASK 1' : 'IELTS WRITING TASK 2';
+            
+            const systemPrompt = `Act as a strict IELTS Examiner. Evaluate the following ${taskName}.
+            Return strictly JSON data.
+            1. Give Band Scores (0-9) for TR/TA, CC, LR, GRA and Overall.
+            2. List 5 critical grammar/vocabulary mistakes and their corrections.
+            3. Provide a paragraph of feedback on how to increase the score.
+            Use the following JSON schema strictly: ${JSON.stringify(SCORING_SCHEMA)}`;
+
+            const userQuery = `Prompt: ${prompt}\n\nStudent Essay: ${essay}`;
+            
+            const payload = {
+                contents: [{ parts: [{ text: userQuery }] }],
+                systemInstruction: { parts: [{ text: systemPrompt }] },
+                generationConfig: {
+                    responseMimeType: "application/json"
+                }
+            };
+
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+                const errData = await response.text();
+                console.error("API Error:", errData);
+                throw new Error(`API Error (${response.status}): Check console for details. Ensure API key is valid.`);
+            }
+
+            const data = await response.json();
+            const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+            
+            if (!rawText) throw new Error("AI returned no content.");
+
+            // Robust JSON Cleanup
+            let jsonStr = rawText.replace(/```json|```/g, '').trim();
+            const firstBrace = jsonStr.indexOf('{');
+            const lastBrace = jsonStr.lastIndexOf('}');
+            if(firstBrace !== -1 && lastBrace !== -1) {
+                jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
+            }
+
+            return JSON.parse(jsonStr);
+        }
+
+        function displayResults(data) {
+            document.getElementById('overall-score').textContent = data.overallBandScore;
+            
+            const scores = data.taskCriteriaScores || {};
+            document.getElementById('score-tr').textContent = scores.TaskAchievementOrResponse || '-';
+            document.getElementById('score-cc').textContent = scores.CoherenceAndCohesion || '-';
+            document.getElementById('score-lr').textContent = scores.LexicalResource || '-';
+            document.getElementById('score-gra').textContent = scores.GrammaticalRangeAndAccuracy || '-';
+
+            document.getElementById('detailed-feedback').textContent = data.detailedFeedbackToElevateScore;
+
+            const list = document.getElementById('mistakes-list');
+            list.innerHTML = '';
+            
+            if (data.keyMistakesAndCorrections?.length) {
+                data.keyMistakesAndCorrections.forEach(m => {
+                    const li = document.createElement('li');
+                    li.className = "p-4 bg-red-50 rounded-lg border-l-4 border-red-400";
+                    li.innerHTML = `<div class="font-medium text-red-800 line-through decoration-red-400 decoration-2 opacity-70">${m.mistake}</div>
+                                    <div class="text-green-700 font-semibold mt-1">➜ ${m.correction}</div>`;
+                    list.appendChild(li);
+                });
+            } else {
+                list.innerHTML = '<li class="text-gray-500">No major mistakes found. Good job!</li>';
+            }
+
+            document.getElementById('results-area').classList.remove('hidden');
+            document.getElementById('results-area').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function setLoading(isLoading) {
+            const btn = document.getElementById('submit-button');
+            const spinner = document.getElementById('loading-spinner');
+            
+            if (isLoading) {
+                btn.classList.add('hidden');
+                spinner.classList.remove('hidden');
+            } else {
+                btn.classList.remove('hidden');
+                spinner.classList.add('hidden');
+            }
+        }
+
+        function showError(msg) {
+            document.getElementById('error-text').textContent = msg;
+            document.getElementById('error-message').classList.remove('hidden');
+        }
+    </script>
+</body>
+</html>
